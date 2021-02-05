@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from rango.models import Category, Page
 from rango.forms import CategoryForm, PageForm, UserForm, UserProfileForm
+from datetime import datetime
 
 def index(request):
     #Query the database for categories
@@ -17,19 +18,25 @@ def index(request):
     context_dict['categories'] = category_list
     context_dict['pages'] = page_list
 
+    visitor_cookie_handler(request)
+
     #Return rendered response
-    #We make use of the shortcut function to make lives easier
-    #First parameter is the template
-    return(render(request, 'rango/index.html', context=context_dict))
+    response = render(request, 'rango/index.html', context=context_dict)
+    return response
+
 
 def about(request):
     #Construct a dictionary to pass the template engine as its context
     #Note the key boldmessage matches to the variable in the html doc!
     context_dict = {'boldmessage': 'This tutorial has been put together by Laura Henry'}
 
-    #Return rendered response
-    #We make use of the shortcut function to make lives easier
-    #First parameter is the template
+    visitor_cookie_handler(request)
+
+    context_dict['visits'] = request.session['visits']
+    print(context_dict)
+
+    
+
     return(render(request, 'rango/about.html', context=context_dict))
 
 
@@ -190,3 +197,34 @@ def user_logout(request):
     logout(request)
     print('success')
     return redirect(reverse('rango:index'))
+
+#---------------------------HELPER FUNCTIONS-------------------------------------------------
+
+def visitor_cookie_handler(request):
+    #Get number of visits
+    #Cookies.get
+    #Returns integer value
+    visits = int(get_server_side_cookie(request, 'visits','1'))
+
+    last_visit_cookie = get_server_side_cookie(request, 'last_visit', str(datetime.now()))
+    last_visit_time = datetime.strptime(last_visit_cookie[:-7], '%Y-%m-%d %H:%M:%S')
+
+    #If it has been more than a day
+    if (datetime.now() - last_visit_time).days > 0:
+        visits += 1
+        #Update the last visit cookie
+        request.session['last_visit'] = str(datetime.now())
+
+    else:
+        #Set last visit
+        request.session['last_visit'] = last_visit_cookie
+
+    #Set the visits cookie
+    request.session['visits'] = visits
+
+
+def get_server_side_cookie(request, cookie, default_val=None):
+    val = request.session.get(cookie)
+    if not val:
+        val = default_val
+    return val
